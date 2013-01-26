@@ -43,25 +43,10 @@ function Encrypt(plainText, group) {
     return plainText;
   } else {
     // encrypt, add tag.
-    var key = keys[group];
-    key = hexToIntArray(key);
-        
-    var cipher = new sjcl.cipher.aes(key);
-    dumbtext[0] = 1; dumbtext[1] = 2; dumbtext[2] = 3; dumbtext[3] = 4;
-    var ctext = cipher.encrypt(dumbtext);
-    var outtext = cipher.decrypt(ctext);
-    
-    
-    
     return 'rot13:' + rot13(plainText);
   }
 
 }
-
-
-function strToIntArray(str) { 
-    
-    
 
 // Return the decryption of the message for the given group, in the form of a string.
 // Throws an error in case the string is not properly encrypted.
@@ -84,7 +69,7 @@ function Decrypt(cipherText, group) {
   }
 }
 
-function intArrayToHex(a) {
+function toHex(a) {
     return a.map(function (x) {
         x = x + 0xFFFFFFFF + 1;  // twos complement
         x = x.toString(16); // to hex
@@ -93,7 +78,7 @@ function intArrayToHex(a) {
     }).join('');
 }
 
-function hexToIntArray(b) {
+function toIntArray(b) {
     var c = [];
     while( b.length ) {
         var x = b.substr(0,8);
@@ -112,7 +97,7 @@ function GenerateKey(group) {
 
   var keylen = 8;
   var key = GetRandomValues(keylen);
-  var stringkey = intArrayToHex(key);
+  var stringkey = toHex(key);
   
   // CS255-todo: Well this needs some work...
   //var key = 'CS255-todo';
