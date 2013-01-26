@@ -31,7 +31,7 @@ var keys = {}; // association map of keys: group -> key
 function encryptChunks(chunks, cipher) {
     var res = [];
     for (var i = 0; i < chunks.length; ++i) {
-        var temp = cipher.encrypt(sjcl.codec.utf8String.toBits(chunks[i]));
+        var temp = cipher.encrypt(sjcl.codec.utf8String.toBits(chunks[i]));        
         res.push(sjcl.codec.utf8String.fromBits(temp));
     }
     return res;
@@ -63,14 +63,14 @@ function Encrypt(plainText, group) {
   } else {
     // encrypt, add tag.
     
-    
-    var key = keys[group];
-    chunks = plaintext.match(/.{1,16}/g);    
-    encryptedChunks = encryptChunks(chunks, cipher);
+    var key = keys[group];    
+    var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
+    var chunks = plaintext.match(/.{1,16}/g);    
+    var encryptedChunks = encryptChunks(chunks, cipher);
     var encryptedMsg = concatenateChunks(encryptedChunks);
     
     // return 'rot13:' + rot13(plainText);
-    return 'rot13' + encryptedMsg;
+    return 'rot13:' + encryptedMsg;
   
   }
 
