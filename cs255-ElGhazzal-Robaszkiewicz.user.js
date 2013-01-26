@@ -27,6 +27,25 @@
 var my_username; // user signed in as
 var keys = {}; // association map of keys: group -> key
 
+
+function encryptChunks(chunks, cipher) {
+    var res = [];
+    for (var i = 0; i < chunks.length; ++i) {
+        var temp = cipher.encrypt(sjcl.codec.utf8String.toBits(chunks[i]));
+        res.push(sjcl.codec.utf8String.fromBits(temp));
+    }
+    return res;
+}
+
+function concatenateChunks(encryptedChunks) {
+    var res = '';
+    for (var i = 0; i < encryptedChunks.length; ++i) {
+        res = res + encryptedChunks[i];
+    }
+    return res;
+}
+
+
 // Some initialization functions are called at the very end of this script.
 // You only have to edit the top portion.
 
@@ -43,23 +62,19 @@ function Encrypt(plainText, group) {
     return plainText;
   } else {
     // encrypt, add tag.
-    var key = keys[group];
-    key = hexToIntArray(key);
-        
+    
+    var key = keys[group];    
     var cipher = new sjcl.cipher.aes(key);
-    dumbtext[0] = 1; dumbtext[1] = 2; dumbtext[2] = 3; dumbtext[3] = 4;
-    var ctext = cipher.encrypt(dumbtext);
-    var outtext = cipher.decrypt(ctext);
+    chunks = plaintext.match(/.{1,16}/g);    
+    encryptedChunks = encryptChunks(chunks, cipher);
+    var encryptedMsg = concatenateChunks(encryptedChunks);
     
-    
-    
-    return 'rot13:' + rot13(plainText);
+    // return 'rot13:' + rot13(plainText);
+    return 'rot13:' + encryptedMsg;
+  
   }
 
 }
-
-
-function strToIntArray(str) { 
     
     
 
@@ -84,26 +99,6 @@ function Decrypt(cipherText, group) {
   }
 }
 
-function intArrayToHex(a) {
-    return a.map(function (x) {
-        x = x + 0xFFFFFFFF + 1;  // twos complement
-        x = x.toString(16); // to hex
-        x = ("00000000"+x).substr(-8); // zero-pad to 8-digits
-        return x
-    }).join('');
-}
-
-function hexToIntArray(b) {
-    var c = [];
-    while( b.length ) {
-        var x = b.substr(0,8);
-        x = parseInt(x,16);  // hex string to int
-        x = (x + 0xFFFFFFFF + 1) & 0xFFFFFFFF;   // twos complement
-        c.push(x);
-        b = b.substr(8);
-    }
-    return c;    
-}
 
 // Generate a new key for the given group.
 //
@@ -112,11 +107,11 @@ function GenerateKey(group) {
 
   var keylen = 8;
   var key = GetRandomValues(keylen);
-  var stringkey = intArrayToHex(key);
+  
+  var stringkey = sjcl.codec.base64.fromBits(key);
   
   // CS255-todo: Well this needs some work...
   //var key = 'CS255-todo';
-
   keys[group] = stringkey;
   SaveKeys();
 }
