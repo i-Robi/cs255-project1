@@ -69,15 +69,40 @@ function Decrypt(cipherText, group) {
   }
 }
 
+function toHex(a) {
+    return a.map(function (x) {
+        x = x + 0xFFFFFFFF + 1;  // twos complement
+        x = x.toString(16); // to hex
+        x = ("00000000"+x).substr(-8); // zero-pad to 8-digits
+        return x
+    }).join('');
+}
+
+function toIntArray(b) {
+    var c = [];
+    while( b.length ) {
+        var x = b.substr(0,8);
+        x = parseInt(x,16);  // hex string to int
+        x = (x + 0xFFFFFFFF + 1) & 0xFFFFFFFF;   // twos complement
+        c.push(x);
+        b = b.substr(8);
+    }
+    return c;    
+}
+
 // Generate a new key for the given group.
 //
 // @param {String} group Group name.
 function GenerateKey(group) {
 
+  var keylen = 8;
+  var key = GetRandomValues(keylen);
+  var stringkey = toHex(key);
+  
   // CS255-todo: Well this needs some work...
-  var key = 'CS255-todo';
+  //var key = 'CS255-todo';
 
-  keys[group] = key;
+  keys[group] = stringkey;
   SaveKeys();
 }
 
