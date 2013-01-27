@@ -32,7 +32,7 @@ function encryptChunks(chunks, cipher) {
     var res = [];
     for (var i = 0; i < chunks.length; ++i) {
         var temp = cipher.encrypt(sjcl.codec.utf8String.toBits(chunks[i]));        
-        res.push(sjcl.codec.utf8String.fromBits(temp));
+        res.push(sjcl.codec.base64.fromBits(temp));
     }
     return res;
 }
@@ -45,6 +45,15 @@ function concatenateChunks(encryptedChunks) {
     return res;
 }
 
+function paddingLastChunk(chunks) {
+    var last = chunks[chunks.length - 1]
+    var size = last.length;
+    for (var i = 0; i < 16 - size; ++i) {
+        last += '0';
+    }
+    chunks[chunks.length - 1] = last;
+    return chunks;
+}
 
 // Some initialization functions are called at the very end of this script.
 // You only have to edit the top portion.
@@ -62,22 +71,44 @@ function Encrypt(plainText, group) {
     return plainText;
   } else {
     // encrypt, add tag.
-    
-    var key = keys[group];
-    console.log(key);    
+    //LoadKeys(); 
+    var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
+    // var key = sjcl.codec.base64.toBits(keys[group]);
+
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
-    var chunks = plaintext.match(/.{1,16}/g);    
-    var encryptedChunks = encryptChunks(chunks, cipher);
-    var encryptedMsg = concatenateChunks(encryptedChunks);
+    var chunks = plainText.match(/.{1,16}/g);
+    chunks = paddingLastChunk(chunks);
+    //return 'bla' + chunks[1];
+
     
-    // return 'rot13:' + rot13(plainText);
+    /*var encrypted = cipher.encrypt(sjcl.codec.utf8String.toBits(chunks[0]));        
+    var clear = sjcl.codec.base64.fromBits(encrypted);
+    return clear;*/
+    
+    var encryptedChunks = encryptChunks(chunks, cipher);
+    var encryptedMsg = concatenateChunks(encryptedChunks); 
     return 'rot13:' + encryptedMsg;
+    
   
   }
 
 }
     
     
+function decryptByChunks(encryptedBits, cipher) {
+    var nbChunks = encryptedBits.length / 4;
+    var msg = '';
+    for (var i = 0; i < nbChunks; ++i) {
+        var temp = [];
+        for (var j = 0; j < 4; ++j) {
+            temp.push(encryptedBits[i * 4 + j]);
+        }
+        // var piece = sjcl.codec.utf8String.fromBits(cipher.decrypt(temp));
+        var piece = sjcl.codec.utf8String.fromBits(cipher.decrypt(temp));
+        msg += piece;
+    }
+    return msg;
+}
 
 // Return the decryption of the message for the given group, in the form of a string.
 // Throws an error in case the string is not properly encrypted.
@@ -92,7 +123,13 @@ function Decrypt(cipherText, group) {
   if (cipherText.indexOf('rot13:') == 0) {
 
     // decrypt, ignore the tag.
-    var decryptedMsg = rot13(cipherText.slice(6));
+    /*var decryptedMsg = rot13(cipherText.slice(6));
+    return decryptedMsg;*/
+    cipherText = cipherText.slice(6);
+    var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
+    var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
+    var encryptedBits = sjcl.codec.base64.toBits(cipherText);
+    var decryptedMsg = decryptByChunks(encryptedBits, cipher);
     return decryptedMsg;
 
   } else {
