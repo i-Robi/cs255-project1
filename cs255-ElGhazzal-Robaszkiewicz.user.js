@@ -91,7 +91,7 @@ function Encrypt(plainText, group) {
     return plainText;
   } else {
     // encrypt, add tag.
-    LoadKeys(); 
+    //LoadKeys(); 
     var keyG = keys[group];
         
     //var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
@@ -163,8 +163,8 @@ function Decrypt(cipherText, group) {
     /*var decryptedMsg = rot13(cipherText.slice(6));
     return decryptedMsg;*/
     cipherText = cipherText.slice(6);
-    var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
-    
+    //var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
+    var key = keys[group];
     
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
     

@@ -91,8 +91,7 @@ function Encrypt(plainText, group) {
     return plainText;
   } else {
     // encrypt, add tag.
-    // LoadKeys(); 
-    
+    //LoadKeys(); 
     var keyG = keys[group];
         
     //var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
