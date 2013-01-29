@@ -163,8 +163,8 @@ function Decrypt(cipherText, group) {
     /*var decryptedMsg = rot13(cipherText.slice(6));
     return decryptedMsg;*/
     cipherText = cipherText.slice(6);
-    var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
-    
+    //var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
+    var key = keys[group];
     
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
     
@@ -190,9 +190,7 @@ function GenerateKey(group) {
 
   var keylen = 8;
   var key = GetRandomValues(keylen);
-  
   var stringkey = sjcl.codec.base64.fromBits(key);
-  
   // CS255-todo: Well this needs some work...
   //var key = 'CS255-todo';
   keys[group] = stringkey;
@@ -202,8 +200,14 @@ function GenerateKey(group) {
 // Take the current group keys, and save them to disk.
 function SaveKeys() {
   
+  var password = 'bla';
+  var salt = decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username));
+  var key = sjcl.misc.pbkdf2(password, salt, null, 128);
+    
   // CS255-todo: plaintext keys going to disk?
   var key_str = JSON.stringify(keys);
+
+  
 
   localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(key_str));
 }

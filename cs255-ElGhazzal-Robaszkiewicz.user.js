@@ -28,13 +28,43 @@ var my_username; // user signed in as
 var keys = {}; // association map of keys: group -> key
 
 
-function encryptChunks(chunks, cipher) {
+/*function encryptChunks(chunks, cipher) {
     var res = [];
     for (var i = 0; i < chunks.length; ++i) {
         var temp = cipher.encrypt(sjcl.codec.utf8String.toBits(chunks[i]));        
         res.push(sjcl.codec.base64.fromBits(temp));
         //res.push(sjcl.codec.utf8String.fromBits(temp));
         
+    }
+    return res;
+}*/
+
+function increment(array) {
+    array[3] += 1;
+}
+function decrement(array) {
+    array[3] -= 1;
+}
+function decrementBy(array, l) { 
+    array[3] -= l;
+}
+function incrementBy(array, l) { 
+    array[3] += l;
+}
+
+function encryptChuks(chunks, cipher) {
+    var nonce = GetRandomValues(4);
+    var blockMsg;    
+    var encNonce;
+    var res = [];
+    res.push(sjcl.codec.base64.fromBits(nonce));    
+    var temp;    
+    for (var i = 0; i < chunks.length; ++i) {
+        blockMsg = sjcl.codec.utf8String.toBits(chunks[i]);
+        encNonce = cipher.encrypt(nonce);
+        temp = sjcl.bitArray._xor4(blockMsg, encNonce);
+        res.push(sjcl.codec.base64.fromBits(temp));
+        incremenent(nonce);
     }
     return res;
 }
@@ -117,7 +147,7 @@ function Encrypt(plainText, group) {
 }
     
     
-function decryptByChunks(chunkedCT, cipher) {
+/*function decryptByChunks(chunkedCT, cipher) {
     var res = '';
     for (var i = 0; i < chunkedCT.length; ++i) {
         var temp = sjcl.codec.base64.toBits(chunkedCT[i]);
@@ -125,19 +155,24 @@ function decryptByChunks(chunkedCT, cipher) {
         res += sjcl.codec.utf8String.fromBits(decrypted);
     }
     return res;
-    /*var nbChunks = encryptedBits.length / 4;
-    var msg = '';
-    for (var i = 0; i < nbChunks; ++i) {
-        var temp = [];
-        for (var j = 0; j < 4; ++j) {
-            temp.push(encryptedBits[i * 4 + j]);
-        }
-        // var piece = sjcl.codec.utf8String.fromBits(cipher.decrypt(temp));
-        var piece = sjcl.codec.base64.fromBits(cipher.decrypt(temp));        
-        msg += piece;
+}*/
+
+function decryptByChunks(chunkedCT, cipher) { 
+    var res = '';
+    var nonce = sjcl.codec.base64.toBits(chunkedCT[0]);
+    var sizeCT = chunkedCT.length - 1;
+    incrementBy(nonce, sizeCT - 1);    
+    var curr;
+    var temp;       
+    for (var i = sizeCT; i >= 1; --i) { 
+        curr = sjcl.codec.base64.toBits(chunkedCT[i]);
+        temp = sjcl.bitArray._xor4(cipher.encrypt(nonce), curr);
+        decrement(nonce);
+        res.unshift(sjcl.codec.utf8String.fromBits(temp));
     }
-    return msg;*/
+    return res;
 }
+    
 
 function removePadding(decryptedMsg) {
     var sizeMsg = decryptedMsg.length;
@@ -190,9 +225,7 @@ function GenerateKey(group) {
 
   var keylen = 8;
   var key = GetRandomValues(keylen);
-  
   var stringkey = sjcl.codec.base64.fromBits(key);
-  
   // CS255-todo: Well this needs some work...
   //var key = 'CS255-todo';
   keys[group] = stringkey;
@@ -202,8 +235,14 @@ function GenerateKey(group) {
 // Take the current group keys, and save them to disk.
 function SaveKeys() {
   
+  var password = 'bla';
+  var salt = decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username));
+  var key = sjcl.misc.pbkdf2(password, salt, null, 128);
+    
   // CS255-todo: plaintext keys going to disk?
   var key_str = JSON.stringify(keys);
+
+  
 
   localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(key_str));
 }
