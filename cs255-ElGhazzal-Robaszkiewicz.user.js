@@ -220,23 +220,12 @@ function GenerateKey(group) {
 
 
 function SaveKeys() {
-  var salt;
-  var password;
-  if (localStorage.getItem('facebook-salt-' + my_username)) {
-    // ask for password and check that it is ok
-    password = 'bla';    
-    salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username))); 
-  }
-  else {
-    password = prompt('Please enter a password that will be used to decrypt the DB.');
-    salt = GetRandomValues(4);
-    var toSave = JSON.stringify(salt);
-    localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(toSave));
-  }
+    var salt = localStorage.getItem('facebook-salt-' + my_username);
+    var password = sessionStorage.getItem('pwdDB');
     // CS255-todo: plaintext keys going to disk?
     var key = sjcl.misc.pbkdf2(password, salt, null, 128);
     var key_str = JSON.stringify(keys);
-    var cipher = new scjl.cipher.aes(key);
+    var cipher = new sjcl.cipher.aes(key);
     var encrypted_key_str = encryptString(key_str, cipher);
     localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(encrypted_key_str));
 }
@@ -245,23 +234,36 @@ function SaveKeys() {
 function LoadKeys() {
 
   var salt;  
+  var password;
   if (localStorage.getItem('facebook-salt-' + my_username)) {
       salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username))); 
+      // if variable session does not exist, ask for it
+      if (sessionStorage.getItem('pwdDB') == null) {
+          password = prompt('Enter your password to decrypt DB');          
+          // test if open DB
+          sessionStorage.setItem('pwdDB', password);
+      }
+      else {
+          password = sessionStorage.getItem('pwdDB');     
+      } 
   }
   else {
+      password = prompt('Create a pwd to decrypt your future DB');
       salt = GetRandomValues(4);
       var toSave = JSON.stringify(salt);
-      localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(toSave));
+      localStorage.setItem('facebook-salt-' + my_username, encodeURIComponent(toSave));
+      sessionStorage.setItem('pwdDB', password);
   }
-  var password = 'bla'; 
   keys = {}; // Reset the keys.
   var key = sjcl.misc.pbkdf2(password, salt, null, 128);
   var saved = localStorage.getItem('facebook-keys-' + my_username);
   if (saved) {
     var cipher = new sjcl.cipher.aes(key);
     var encryptedkey_str = decodeURIComponent(saved);
+    console.log(encryptedkey_str);
     // CS255-todo: plaintext keys were on disk?
     var key_str = decryptString(encryptedkey_str, cipher);
+    console.log(key_str);
     keys = JSON.parse(key_str);
   }
 }
