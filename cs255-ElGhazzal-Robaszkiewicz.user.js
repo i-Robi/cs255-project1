@@ -52,7 +52,7 @@ function incrementBy(array, l) {
     array[3] += l;
 }
 
-function encryptChuks(chunks, cipher) {
+function encryptChunks(chunks, cipher) {
     var nonce = GetRandomValues(4);
     var blockMsg;    
     var encNonce;
@@ -64,7 +64,7 @@ function encryptChuks(chunks, cipher) {
         encNonce = cipher.encrypt(nonce);
         temp = sjcl.bitArray._xor4(blockMsg, encNonce);
         res.push(sjcl.codec.base64.fromBits(temp));
-        incremenent(nonce);
+        increment(nonce);
     }
     return res;
 }
@@ -123,20 +123,9 @@ function Encrypt(plainText, group) {
     // encrypt, add tag.
     //LoadKeys(); 
     var keyG = keys[group];
-        
-    //var key = 'HVFa6NkZZY9RyfCY8MmBUjSbeB8T67A4lMnP1AxIBVU=';
-    // var key = sjcl.codec.base64.toBits(keys[group]);
-
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(keyG));
     var chunks = plainText.match(/.{1,16}/g);
     chunks = paddingLastChunk(chunks);
-    //return 'bla' + chunks[1];
-
-    
-    /*var encrypted = cipher.encrypt(sjcl.codec.utf8String.toBits(chunks[0]));        
-    var clear = sjcl.codec.base64.fromBits(encrypted);
-    return clear;*/
-    
     var encryptedChunks = encryptChunks(chunks, cipher);
     var encryptedMsg = concatenateChunks(encryptedChunks); 
     return 'rot13:' + encryptedMsg;
@@ -158,7 +147,7 @@ function Encrypt(plainText, group) {
 }*/
 
 function decryptByChunks(chunkedCT, cipher) { 
-    var res = '';
+    var res = [];
     var nonce = sjcl.codec.base64.toBits(chunkedCT[0]);
     var sizeCT = chunkedCT.length - 1;
     incrementBy(nonce, sizeCT - 1);    
@@ -168,7 +157,7 @@ function decryptByChunks(chunkedCT, cipher) {
         curr = sjcl.codec.base64.toBits(chunkedCT[i]);
         temp = sjcl.bitArray._xor4(cipher.encrypt(nonce), curr);
         decrement(nonce);
-        res.unshift(sjcl.codec.utf8String.fromBits(temp));
+        res = sjcl.codec.utf8String.fromBits(temp) + res;
     }
     return res;
 }
