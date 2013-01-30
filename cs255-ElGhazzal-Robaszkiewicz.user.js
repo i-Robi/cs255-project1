@@ -220,7 +220,8 @@ function GenerateKey(group) {
 
 
 function SaveKeys() {
-    var salt = localStorage.getItem('facebook-salt-' + my_username);
+    if (localStorage.getItem('facebook-salt-' + my_username) == null) console.log('salt does not exits');
+    var salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username)));
     var password = sessionStorage.getItem('pwdDB');
     // CS255-todo: plaintext keys going to disk?
     var key = sjcl.misc.pbkdf2(password, salt, null, 128);
@@ -235,7 +236,7 @@ function LoadKeys() {
 
   var salt;  
   var password;
-  if (localStorage.getItem('facebook-salt-' + my_username)) {
+  if (localStorage.getItem('facebook-salt-' + my_username) != null) {
       salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username))); 
       // if variable session does not exist, ask for it
       if (sessionStorage.getItem('pwdDB') == null) {
