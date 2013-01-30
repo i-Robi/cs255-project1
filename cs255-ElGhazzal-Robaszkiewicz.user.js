@@ -236,6 +236,9 @@ function LoadKeys() {
 
   var salt;  
   var password;
+  if (my_username == undefined) {
+    return;
+  }
   if (localStorage.getItem('facebook-salt-' + my_username) != null) {
       salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username))); 
       // if variable session does not exist, ask for it
