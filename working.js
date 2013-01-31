@@ -222,63 +222,30 @@ function GenerateKey(group) {
 function SaveKeys() {
     if (localStorage.getItem('facebook-salt-' + my_username) == null) console.log('salt does not exits');
     var salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username)));
-    
-    /*var password = sessionStorage.getItem('pwdDB');
-    var key = sjcl.misc.pbkdf2(password, salt, null, 128);*/
-    var key = sjcl.codec.base64.toBits(sessionStorage.getItem('keyDB'));
+    var password = sessionStorage.getItem('pwdDB');
     // CS255-todo: plaintext keys going to disk?
-    keys['00000000'] = '0000';
+    var key = sjcl.misc.pbkdf2(password, salt, null, 128);
     var key_str = JSON.stringify(keys);
     var cipher = new sjcl.cipher.aes(key);
     var encrypted_key_str = encryptString(key_str, cipher);
     localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(encrypted_key_str));
 }
 
-function decryptDatabase(password, salt) {
-    var key = sjcl.misc.pbkdf2(password, salt, null, 128);
-    var saved = localStorage.getItem('facebook-keys-' + my_username);
-    if (saved) {
-        var cipher = new sjcl.cipher.aes(key);
-        var encryptedkey_str = decodeURIComponent(saved);
-        // CS255-todo: plaintext keys were on disk?
-
-        try {
-            var key_str = decryptString(encryptedkey_str, cipher);
-        }
-        catch(err) {
-            return false;
-        }   
-        keys = JSON.parse(key_str);
-        if (keys['00000000'] === '0000') return true;
-    }
-    return false;
-}
-
-
 // Load the group keys from disk.
 function LoadKeys() {
 
   var salt;  
   var password;
-  var key;
-  if (my_username == undefined) {
-    return;
-  }
   if (localStorage.getItem('facebook-salt-' + my_username) != null) {
       salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username))); 
       // if variable session does not exist, ask for it
-      //if (sessionStorage.getItem('pwdDB') == null) {
-      if (sessionStorage.getItem('keyDB') == null) {
-          do {
-            password = prompt('Enter your password to decrypt DB');          
-          } while (!decryptDatabase(password, salt))
-          //sessionStorage.setItem('pwdDB', password);
-          key = sjcl.misc.pbkdf2(password, salt, null, 128);
-          sessionStorage.setItem('keyDB', sjcl.codec.base64.fromBits(key));
+      if (sessionStorage.getItem('pwdDB') == null) {
+          password = prompt('Enter your password to decrypt DB');          
+          // test if open DB
+          sessionStorage.setItem('pwdDB', password);
       }
       else {
-          key = sjcl.codec.base64.toBits(sessionStorage.getItem('keyDB'));
-          // password = sessionStorage.getItem('pwdDB');     
+          password = sessionStorage.getItem('pwdDB');     
       } 
   }
   else {
@@ -286,21 +253,19 @@ function LoadKeys() {
       salt = GetRandomValues(4);
       var toSave = JSON.stringify(salt);
       localStorage.setItem('facebook-salt-' + my_username, encodeURIComponent(toSave));
-      // sessionStorage.setItem('pwdDB', password);
-      keys['00000000'] = '0000';
-      key = sjcl.misc.pbkdf2(password, salt, null, 128);
-      sessionStorage.setItem('keyDB', sjcl.codec.base64.fromBits(key));
-      SaveKeys();  
+      sessionStorage.setItem('pwdDB', password);
   }
   keys = {}; // Reset the keys.
+  var key = sjcl.misc.pbkdf2(password, salt, null, 128);
   var saved = localStorage.getItem('facebook-keys-' + my_username);
   if (saved) {
     var cipher = new sjcl.cipher.aes(key);
     var encryptedkey_str = decodeURIComponent(saved);
+    console.log(encryptedkey_str);
     // CS255-todo: plaintext keys were on disk?
     var key_str = decryptString(encryptedkey_str, cipher);
+    console.log(key_str);
     keys = JSON.parse(key_str);
-    // delete keys['00000000'];
   }
 }
 
@@ -650,7 +615,6 @@ function UpdateKeysTable() {
 
   // keys
   for (var group in keys) {
-    if (group === '00000000') continue;
     var row = document.createElement('tr');
     row.setAttribute("data-group", group);
     var td = document.createElement('td');
