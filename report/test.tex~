@@ -121,6 +121,8 @@ We experienced some trouble with the encodings of strings. As a result, the enco
 
 \subsection{Security of the key storage}
 
+
+
 Never store the password anywhere.
 
 Salt generated at random (enough entropy)
@@ -155,9 +157,22 @@ instead of ``supposed to be secure''.}  of our encryption and decryption schemes
 \item The construction we used on top of \emph{AES-256} is \emph{Randomized Counter Mode}, which is secure under CPA as long as the nonce space is large enough and the nonce is chosen at random (we took a 128-bit random nonce so it is the case here).
 More precisely, if $q$ is the number of queries the adversary $A$ is allowed to do, we have that there exists a PRF adversary $B$, such that:
 \[
- \text{Adv}_{CPA}[A,E_{CTR}] \leq 2 \text{Adv}_{PRF}[B,F] + \frac{2q^2L}{|X|} 
+ \text{Adv}_{CPA}[A,E_{CTR}] \leq 2 \text{Adv}_{PRF}[B,\text{AES}] + \frac{2q^2L}{|X|} 
 \]
 where in our case $|X| = 2^{128}$.
 
+\section{Other things}
+\paragraph{Using a web browser to do cryptography}
+
+\paragraph{Potential attacks}
+There are a couple of potential attacks on our script:
+\begin{itemize}
+ \item Brute-force attack on the password: having at his disposal the salt and the encrypted in the \texttt{localStorage}, a pirate could try to decrypt the database by trying a large number
+ of passwords and see if the key generated from the salt and the password manage to decrypt the database. This is a serious attack as it can in theory be realized in parallel (by copying the files
+ to several machines) and therefore if the password is not too strong, the database can be decrypted in a relatively small amount of time.
+\end{itemize}
+
+
 \end{itemize}
 \end{document}
+
