@@ -106,7 +106,6 @@ function paddingLastChunk(chunks) {
 }                
 
 function encryptString(plainText, cipher) { 
-    plainText = encodeURIComponent(plainText);
     var chunks = plainText.match(/.{1,16}/g);
     chunks = paddingLastChunk(chunks);
     var encryptedChunks = encryptChunks(chunks, cipher);
@@ -177,7 +176,7 @@ function decryptString(cipherText, cipher) {
     //var encryptedBits = sjcl.codec.base64.toBits(cipherText);    
     //return encryptedBits.length.toString();
     var decryptedMsg = decryptByChunks(chunkedCT, cipher);
-    return decodeURIComponent(removePadding(decryptedMsg));
+    return removePadding(decryptedMsg);
 }
 // Return the decryption of the message for the given group, in the form of a string.
 // Throws an error in case the string is not properly encrypted.

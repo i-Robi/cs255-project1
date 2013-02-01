@@ -1,0 +1,163 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage{amsmath}
+\usepackage{stmaryrd}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\title{
+  CS 255 -- Project 1 (Part 1) }
+\author{
+  Sammy El Ghazzal\\
+  (SUNetID: selghazz)
+  \and
+  S\'ebastien Robaszkiewicz\\
+  (SUNetID: robinio)
+}
+\date{}
+\begin{document}
+  \maketitle
+
+
+%%------------------------------------------------------------------
+%%------------------------------------------------------------------
+%%
+%% Implementation details
+%%
+%%------------------------------------------------------------------
+%%------------------------------------------------------------------
+
+
+\section{Implementation details}
+
+%%------------------------------------------------------------------
+%% Maintaining a secure database
+%%------------------------------------------------------------------
+
+\subsection{Maintaining a secure database}
+
+In the rest of the document, the \textit{database} will refer to a JSON object called \texttt{keys}. In this JSON object, the key-values pairs are as follows:
+\begin{itemize}
+  \item Key: it is the name of a Facebook group a user belongs to;
+  \item Value: it is the (cryptographic) key used to encrypt the messages in this group.
+\end{itemize}
+
+\subsubsection{Initialization}
+
+When a user connects to Facebook \textit{for the first time}, we use the following process.
+
+\paragraph{Password}
+The first time a user connects to Facebook, we ask to set a password to encrypt the database thanks to the function \texttt{prompt()}. After this step, a salt is automatically generated.
+
+\paragraph{Salt}\label{salt}
+We generate the salt (a \texttt{bitArray} of length~128) with the function \texttt{GetRandomValues}, which is optimized to produce enough entropy. We convert the salt to the \texttt{base64} string format, and store this string in plaintext in the \texttt{localStorage}. toto why is this secure (to be discussed in next section)
+
+\paragraph{Key}
+We generate the key (another \texttt{bitArray}) thanks to the function \texttt{sjcl.misc.pbkdf2}: the key is derived from the password and the salt mentioned above. We convert the key to the \texttt{base64} string format, and we store it in \texttt{sessionStorage}. (Note that consequently, we don’t store the password anywhere.)
+
+\paragraph{Encrypting the database}
+We chose to encrypt the entire \texttt{keys} JSON object by converting it to a string, and encrypting the whole string with the key mentioned above\footnote{That way, the only information that an attacker could get if he doesn’t have the right password is the size of the encrypted database. This would not have been the case if, for example, we had chosen to individually encrypt each key and each value from the database \texttt{keys}.}. We store this encrypted JSON in \texttt{localStorage}.
+% For this, we use a dummy entry in the database \texttt{keys}: \texttt{00000000 => 0000}.
+\subsubsection{Regular use}
+
+When a user comes \textit{back} to Facebook (\emph{i.e.} when the database already exists), we ask them for their password in order to decrypt the database. 
+
+\paragraph{Is the password correct?}
+
+When the user enters his password, we generate a key just like previously: we use the function \texttt{sjcl.misc.pbkdf2} with this password, and the salt which is already stored in \texttt{localStorage}. In order to be able to check that the password
+is correct, we added a dummy entry in the database, \texttt{00000000 => 0000}.
+Then, we try to decrypt the database with the generated key: if we can read the entry \texttt{00000000} and its associated value \texttt{0000}, then the entered password is the right password. If not, we ask for the password again. If the user doesn't want to enter a password, we terminate the script.
+
+
+%%------------------------------------------------------------------
+%% Generating new keys
+%%------------------------------------------------------------------
+
+\subsection{Generating new keys}
+The function \texttt{GenerateKeys} is pretty simple as it relies heavily on the \texttt{GetRandomValues} function. We chose to generate 256-bit keys even though as we saw in class, the 256-bit AES implementation is buggy and can be attacked in $2^{112}$ toto verif this number. For convenience, we store a \texttt{base64} encoding of the key in the database \texttt{keys}.
+
+
+%%------------------------------------------------------------------
+%% Encryption and decryption functions that provide CPA security for Facebook group messages
+%%------------------------------------------------------------------
+
+\subsection{Encryption and decryption functions that provide CPA security for Facebook group messages}
+\paragraph{Choice of the block cipher}
+We chose to implement the \emph{Randomized Counter Mode} construction on top of AES because of the advantages it presents compared to other constructions (CBC in particular):
+\begin{itemize}
+\item It is parallelizable (although in general Facebook messages will not be long enough to justify the need for a parallel system)
+\item In case a block is corrupted, only one block of ciphertext will be corrupted\footnote{In our particular case, the fact that one block is corrupted is sufficient to throw an error in the JS script and therefore stop the decryption / encryption taking place, but this remark goes beyond the scope of this assignment.}
+\item Its security bound is better (see Section~\ref{sec:security} for more details)
+\end{itemize}
+For the IV, we use a 128-bit nonce (which corresponds to exactly one block) chosen at random thanks to the function \texttt{GetRandomValues}. This nonce is concatenated at the beginning of the ciphertext.
+
+\paragraph{Padding}
+Although padding is not necessary when using \emph{Randomized Counter Mode}, our encryption and 
+decryption schemes use padding whenever the encrypted message length is not a multiple of the block size and a dummy block otherwise. More precisely:
+\begin{itemize}
+\item If the plaintext has a length that is a multiple of the block size (namely 128 bits \emph{i.e.} 16 characters), we add a dummy block of 16 characters \texttt{f} at the end of the plaintext
+For instance ``Hello nice world'' would be transformed into ``Hello nice worldffffffffffffffff'' before being encrypted.
+\item If the plaintext has a length that has $1 \leq r \leq 15$ characters after the end of the last full block, then we add $16-r$ times the encoding of $15-r$ in hexadecimal\footnote{The fact that we chose to encode the “residual” length in hexadecimal is that it allows us to have only one character for double digit lengths.} at the end of the plaintext before the encryption.
+For instance, the sentence ``Hello world'' which has 11 characters, would be padded as follows: ``Hello world4444''
+\end{itemize}
+When decrypting, we consider the string as if it had a length that is a multiple of the block length, and then we remove the number of characters indicated by the last character.
+
+\paragraph{Encodings}
+We experienced some trouble with the encodings of strings. As a result, the encoding of the plaintext and ciphertext are different, namely the plaintext is considered to be a \texttt{utf8String} and the ciphertext is encoded in \texttt{base64} string format. When decrypting, instead of splitting the ciphertext into 16-character chunks, we split it into 24-character chunks.
+
+
+
+%%------------------------------------------------------------------
+%%------------------------------------------------------------------
+%%
+%% Security
+%%
+%%------------------------------------------------------------------
+%%------------------------------------------------------------------
+
+\section{Security}
+\label{sec:security}
+%%------------------------------------------------------------------
+%% Security of the key storage
+%%------------------------------------------------------------------
+
+\subsection{Security of the key storage}
+
+Never store the password anywhere.
+
+Salt generated at random (enough entropy)
+
+Key generated from that salt along with the password using PBKDF2
+
+Only information about the database which is stored on the disk is the encrypted database (cf. encryption/decryption algorithms below, we use the same to encrypt the messages and the db) => the only information we practically have about the db is its size.
+
+
+
+%%------------------------------------------------------------------
+%% Security of the key generation
+%%------------------------------------------------------------------
+
+\subsection{Security of the key generation}
+
+The key generation step relies on the \texttt{GetRandomValues} function. The design of this function ensures that information encoded by such a key is indistinguishable from random (unlike a function from the javascript \texttt{Math} library for instance).
+
+
+
+
+%%------------------------------------------------------------------
+%% Security of the encryption / decryption steps
+%%------------------------------------------------------------------
+
+\subsection{Security of the encryption / decryption steps}
+
+There are toto main steps to ``prove'' the security\footnote{In the remainder of this write-up, we use ``is secure''
+instead of ``supposed to be secure''.}  of our encryption and decryption schemes:
+\begin{itemize}
+\item The underlying primitive we used for block cipher is \emph{AES-256} which is supposed to be a secure PRP
+\item The construction we used on top of \emph{AES-256} is \emph{Randomized Counter Mode}, which is secure under CPA as long as the nonce space is large enough and the nonce is chosen at random (we took a 128-bit random nonce so it is the case here).
+More precisely, if $q$ is the number of queries the adversary $A$ is allowed to do, we have that there exists a PRF adversary $B$, such that:
+\[
+ \text{Adv}_{CPA}[A,E_{CTR}] \leq 2 \text{Adv}_{PRF}[B,F] + \frac{2q^2L}{|X|} 
+\]
+where in our case $|X| = 2^{128}$.
+
+\end{itemize}
+\end{document}
