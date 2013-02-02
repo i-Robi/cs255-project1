@@ -20,13 +20,13 @@
 %%------------------------------------------------------------------
 %%------------------------------------------------------------------
 %%
-%% Implementation details
+%% Implementation
 %%
 %%------------------------------------------------------------------
 %%------------------------------------------------------------------
 
 
-\section{Implementation details}
+\section{Implementation}
 
 %%------------------------------------------------------------------
 %% Maintaining a secure database
@@ -51,10 +51,10 @@ The first time a user connects to Facebook, we ask to set a password to encrypt 
 We generate the salt (a \texttt{bitArray} of length~128) with the function \texttt{GetRandomValues}, which is optimized to produce enough entropy. We convert the salt to the \texttt{base64} string format, and store this string in plaintext in the \texttt{localStorage}. toto why is this secure (to be discussed in next section)
 
 \paragraph{Key}
-We generate the key (another \texttt{bitArray}) thanks to the function \texttt{sjcl.misc.pbkdf2}: the key is derived from the password and the salt mentioned above. We convert the key to the \texttt{base64} string format, and we store it in \texttt{sessionStorage}. (Note that consequently, we don’t store the password anywhere.)
+We generate the key (another \texttt{bitArray}) thanks to the function \texttt{sjcl.misc.pbkdf2}: the key is derived from the password and the salt mentioned above. We convert the key to the \texttt{base64} string format, and we store it in \texttt{sessionStorage}. (Note that consequently, we don't store the password anywhere.)
 
 \paragraph{Encrypting the database}
-We chose to encrypt the entire \texttt{keys} JSON object by converting it to a string, and encrypting the whole string with the key mentioned above\footnote{That way, the only information that an attacker could get if he doesn’t have the right password is the size of the encrypted database. This would not have been the case if, for example, we had chosen to individually encrypt each key and each value from the database \texttt{keys}.}. We store this encrypted JSON in \texttt{localStorage}.
+We chose to encrypt the entire \texttt{keys} JSON object by converting it to a string, and encrypting the whole string with the key mentioned above. We store this encrypted JSON in \texttt{localStorage}.
 % For this, we use a dummy entry in the database \texttt{keys}: \texttt{00000000 => 0000}.
 \subsubsection{Regular use}
 
@@ -121,15 +121,16 @@ We experienced some trouble with the encodings of strings. As a result, the enco
 
 \subsection{Security of the key storage}
 
+Each step of the process is secure:
+\begin{itemize}
+  \item The salt is generated at random based on Chrome's \texttt{window.crypto.getRandomValues} function, which provides cryptographically secure random numbers
+  \item Key generated from that salt along with the password using PBKDF2, as recommended by RSA's PKCS \#5 standard
+  \item We encrypt / decrypt the database using the same algorithms as for encrypting / decrypting message, please refer to section~\ref{security-encryption-decryption} for security details about those algorithms
+\end{itemize}
 
+That way, the only information that an attacker has about the database is its total size.
 
-Never store the password anywhere.
-
-Salt generated at random (enough entropy)
-
-Key generated from that salt along with the password using PBKDF2
-
-Only information about the database which is stored on the disk is the encrypted database (cf. encryption/decryption algorithms below, we use the same to encrypt the messages and the db) => the only information we practically have about the db is its size.
+In summary, the salt and the securely encrypted database are stored in \texttt{localStorage} (which is the only thing the attacker can access), whereas the database key (which is generated securely) is stored in \texttt{sessionStorage} and the attacker will never see it. Note that during the whole process, we never store the password anywhere.
 
 
 
@@ -148,31 +149,39 @@ The key generation step relies on the \texttt{GetRandomValues} function. The des
 %% Security of the encryption / decryption steps
 %%------------------------------------------------------------------
 
-\subsection{Security of the encryption / decryption steps}
+\subsection{Security of the encryption / decryption steps}\label{security-encryption-decryption}
 
 There are toto main steps to ``prove'' the security\footnote{In the remainder of this write-up, we use ``is secure''
 instead of ``supposed to be secure''.}  of our encryption and decryption schemes:
 \begin{itemize}
 \item The underlying primitive we used for block cipher is \emph{AES-256} which is supposed to be a secure PRP
 \item The construction we used on top of \emph{AES-256} is \emph{Randomized Counter Mode}, which is secure under CPA as long as the nonce space is large enough and the nonce is chosen at random (we took a 128-bit random nonce so it is the case here).
-More precisely, if $q$ is the number of queries the adversary $A$ is allowed to do, we have that there exists a PRF adversary $B$, such that:
-\[
- \text{Adv}_{CPA}[A,E_{CTR}] \leq 2 \text{Adv}_{PRF}[B,\text{AES}] + \frac{2q^2L}{|X|} 
-\]
-where in our case $|X| = 2^{128}$.
-
-\section{Other things}
-\paragraph{Using a web browser to do cryptography}
-
-\paragraph{Potential attacks}
-There are a couple of potential attacks on our script:
-\begin{itemize}
- \item Brute-force attack on the password: having at his disposal the salt and the encrypted in the \texttt{localStorage}, a pirate could try to decrypt the database by trying a large number
- of passwords and see if the key generated from the salt and the password manage to decrypt the database. This is a serious attack as it can in theory be realized in parallel (by copying the files
- to several machines) and therefore if the password is not too strong, the database can be decrypted in a relatively small amount of time.
+More precisely, if $q$ is the number of queries the adversary $A$ is allowed to do, we know that there exists a PRF adversary $B$, such that:
+\begin{equation}\label{eq:sec1}
+ \text{Adv}_{CPA}[A,E_{CTR}] \leq 2 \text{Adv}_{PRF}[B,\text{AES}] +  \frac{2q^2L}{|X|}
+\end{equation}
+where in our case $|X| = 2^{128}$ and therefore, if $A$ is able to break $E_{CTR}$ under the assumption that $\frac{2q^2L}{|X|}$ is negligible\footnote{This assumption basically means that the user of the script should change his key when the term $\frac{2q^2L}{|X|}$ is non-negligible, \emph{i.e.} that the user uses the library correctly.}, then it would mean that $\text{Adv}_{PRF}[B,\text{AES}]$ is non-negligible, \emph{i.e.} that adversary $B$ would be able to break AES, which we suppose to be impossible.
+\paragraph{Important note:} To argue for the security of our encryption and decryption schemes, we make the important assumption that $\frac{2q^2L}{|X|}$ is negligible, \emph{i.e.} that the user changes the key whenever $q^2L$ is ``too big''. In our script, we \emph{do not check} that this is indeed the case\footnote{Justin Chen told me that it was ok not to make this checking.}. Just to have an idea of how many messages can be sent using one key, let us do a quick calculation: Facebook requires the message length to be less than 10000 characters long, that is $L$ = 625 blocks. Then we compute that the number of such messages sent $q$ should be such that (we say that the advantage is negligible if it is less than $\epsilon = 2^{-80}$)
+\begin{equation*}
+q \leq \sqrt{\frac{\epsilon|X|}{2L}}  = q_{max} \Leftrightarrow q_{max} \approx 470000
+\end{equation*}
+That is, for the encryption / decryption scheme to become insecure, the user would need to send around 470000 messages of 10000 characters each. Saying that this is too much for a single group is probably reasonable, even if to be perfectly secure, it would be better to implement a system that keeps track of the number of messages being sent through the group.
 \end{itemize}
 
 
-\end{itemize}
+
+% \section{Other things}
+% \paragraph{Using a web browser to do cryptography}
+% 
+% \paragraph{Potential attacks}
+% There are a couple of potential attacks on our script:
+% \begin{itemize}
+%  \item Brute-force attack on the password: having at his disposal the salt and the encrypted in the \texttt{localStorage}, a pirate could try to decrypt the database by trying a large number
+%  of passwords and see if the key generated from the salt and the password manage to decrypt the database. This is a serious attack as it can in theory be realized in parallel (by copying the files
+%  to several machines) and therefore if the password is not too strong, the database can be decrypted in a relatively small amount of time.
+% \end{itemize}
+
+
 \end{document}
+
 

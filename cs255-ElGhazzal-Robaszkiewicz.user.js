@@ -51,7 +51,47 @@ function decrementBy(array, l) {
 function incrementBy(array, l) { 
     array[3] += l;
 }
+/*
+function increment(array) { 
+    var ind = 3;
+    while (ind >= 0) { 
+        if (array[ind] === 2^31 - 1) {
+            array[ind] = -2^31;
+            --ind;
+        }
+        else { 
+            ++array[ind];
+            break;
+        }
+    }
+}
 
+function decrement(array) { 
+    var ind = 3;
+    while (ind >= 0) { 
+        if (array[ind] === -2^31) {
+            array[ind] = 2^31 - 1;
+            --ind;
+        }
+        else { 
+            --array[ind];
+            break;
+        }
+    }
+}
+
+function incrementBy(array, l) {
+    for (var i = 0; i < l; ++i) { 
+        increment(array);
+    }
+}
+
+function decrementBy(array, l) { 
+    for (var i = 0; i < l; ++i) { 
+        decrement(array);
+    }
+}
+*/
 function encryptChunks(chunks, cipher) {
     var nonce = GetRandomValues(4);
     var blockMsg;    

@@ -1,6 +1,8 @@
 \documentclass[10pt,twocolumn]{article}
 \usepackage{amsmath}
 \usepackage{stmaryrd}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
 \title{
   CS 255 -- Project 1 (Part 1) }
 \author{
@@ -18,13 +20,13 @@
 %%------------------------------------------------------------------
 %%------------------------------------------------------------------
 %%
-%% Implementation details
+%% Implementation
 %%
 %%------------------------------------------------------------------
 %%------------------------------------------------------------------
 
 
-\section{Implementation details}
+\section{Implementation}
 
 %%------------------------------------------------------------------
 %% Maintaining a secure database
@@ -52,15 +54,17 @@ We generate the salt (a \texttt{bitArray} of length~128) with the function \text
 We generate the key (another \texttt{bitArray}) thanks to the function \texttt{sjcl.misc.pbkdf2}: the key is derived from the password and the salt mentioned above. We convert the key to the \texttt{base64} string format, and we store it in \texttt{sessionStorage}. (Note that consequently, we don’t store the password anywhere.)
 
 \paragraph{Encrypting the database}
-We chose to encrypt the entire \texttt{keys} JSON object by converting it to a string, and encrypting the whole string with the key mentioned above\footnote{That way, the only information that an attacker could get if he doesn’t have the right password is the size of the encrypted database. This would not have been the case if, for example, we had chosen to individually encrypt each key and each value from the database \texttt{keys}.}. We store this encrypted JSON in \texttt{localStorage}.
-
+We chose to encrypt the entire \texttt{keys} JSON object by converting it to a string, and encrypting the whole string with the key mentioned above. We store this encrypted JSON in \texttt{localStorage}.
+% For this, we use a dummy entry in the database \texttt{keys}: \texttt{00000000 => 0000}.
 \subsubsection{Regular use}
 
-When a user comes \textit{back} to Facebook (\emph{i.e.} when the database already exists), we ask them for their password in order to decrypt the database. For this, we use a dummy entry in the database \texttt{keys}: \texttt{00000000 => 0000}.
+When a user comes \textit{back} to Facebook (\emph{i.e.} when the database already exists), we ask them for their password in order to decrypt the database. 
 
 \paragraph{Is the password correct?}
 
-When the user enters his password, we generate a key just like previously: we use the function \texttt{sjcl.misc.pbkdf2} with this password, and the salt which is already stored in \texttt{localStorage}. Then, we try to decrypt the database with the generated key: if we can read the entry \texttt{00000000}, then the entered password is the right password. If not, we ask for the password again. If the user doesn't want to enter a password, we terminate the script.
+When the user enters his password, we generate a key just like previously: we use the function \texttt{sjcl.misc.pbkdf2} with this password, and the salt which is already stored in \texttt{localStorage}. In order to be able to check that the password
+is correct, we added a dummy entry in the database, \texttt{00000000 => 0000}.
+Then, we try to decrypt the database with the generated key: if we can read the entry \texttt{00000000} and its associated value \texttt{0000}, then the entered password is the right password. If not, we ask for the password again. If the user doesn't want to enter a password, we terminate the script.
 
 
 %%------------------------------------------------------------------
@@ -79,9 +83,9 @@ The function \texttt{GenerateKeys} is pretty simple as it relies heavily on the 
 \paragraph{Choice of the block cipher}
 We chose to implement the \emph{Randomized Counter Mode} construction on top of AES because of the advantages it presents compared to other constructions (CBC in particular):
 \begin{itemize}
-\item It is parallelizable (although in general Facebook messages will not be long enough to need a parallel system)
+\item It is parallelizable (although in general Facebook messages will not be long enough to justify the need for a parallel system)
 \item In case a block is corrupted, only one block of ciphertext will be corrupted\footnote{In our particular case, the fact that one block is corrupted is sufficient to throw an error in the JS script and therefore stop the decryption / encryption taking place, but this remark goes beyond the scope of this assignment.}
-\item Its security bound is better totoref section security
+\item Its security bound is better (see Section~\ref{sec:security} for more details)
 \end{itemize}
 For the IV, we use a 128-bit nonce (which corresponds to exactly one block) chosen at random thanks to the function \texttt{GetRandomValues}. This nonce is concatenated at the beginning of the ciphertext.
 
@@ -90,7 +94,9 @@ Although padding is not necessary when using \emph{Randomized Counter Mode}, our
 decryption schemes use padding whenever the encrypted message length is not a multiple of the block size and a dummy block otherwise. More precisely:
 \begin{itemize}
 \item If the plaintext has a length that is a multiple of the block size (namely 128 bits \emph{i.e.} 16 characters), we add a dummy block of 16 characters \texttt{f} at the end of the plaintext
-\item If the plaintext has a length that has $1 \leq r \leq 15$ characters after the end of the last full block totochangethis, then we add $r$ times the encoding of $15-r$ in hexadecimal\footnote{The fact that we chose to encode the “residual” length in hexadecimal is that it allows us to have only one character for double digit lengths.} at the end of the plaintext before the encryption.
+For instance ``Hello nice world'' would be transformed into ``Hello nice worldffffffffffffffff'' before being encrypted.
+\item If the plaintext has a length that has $1 \leq r \leq 15$ characters after the end of the last full block, then we add $16-r$ times the encoding of $15-r$ in hexadecimal\footnote{The fact that we chose to encode the “residual” length in hexadecimal is that it allows us to have only one character for double digit lengths.} at the end of the plaintext before the encryption.
+For instance, the sentence ``Hello world'' which has 11 characters, would be padded as follows: ``Hello world4444''
 \end{itemize}
 When decrypting, we consider the string as if it had a length that is a multiple of the block length, and then we remove the number of characters indicated by the last character.
 
@@ -108,20 +114,24 @@ We experienced some trouble with the encodings of strings. As a result, the enco
 %%------------------------------------------------------------------
 
 \section{Security}
-
+\label{sec:security}
 %%------------------------------------------------------------------
 %% Security of the key storage
 %%------------------------------------------------------------------
 
 \subsection{Security of the key storage}
 
+
+
 Never store the password anywhere.
 
 Salt generated at random (enough entropy)
 
-Key generated from that salt with PBKDF2
+Key generated from that salt along with the password using PBKDF2
 
-Only information about the database which is stored to disk is the encrypted database (cf. encryption/decryption algorithms below, we use the same to encrypt the messages and the db) => the only information we practically have about the db is its size.
+Only information about the database which is stored on the disk is the encrypted database (cf. encryption/decryption algorithms below, we use the same to encrypt the messages and the db) 
+
+That way, the only information that an attacker has from the ciphertext is the size of the encrypted database. This would not have been the case if, for example, we had chosen to individually encrypt each key and each value from the database \texttt{keys}.
 
 
 
@@ -147,5 +157,25 @@ instead of ``supposed to be secure''.}  of our encryption and decryption schemes
 \begin{itemize}
 \item The underlying primitive we used for block cipher is \emph{AES-256} which is supposed to be a secure PRP
 \item The construction we used on top of \emph{AES-256} is \emph{Randomized Counter Mode}, which is secure under CPA as long as the nonce space is large enough and the nonce is chosen at random (we took a 128-bit random nonce so it is the case here).
+More precisely, if $q$ is the number of queries the adversary $A$ is allowed to do, we have that there exists a PRF adversary $B$, such that:
+\[
+ \text{Adv}_{CPA}[A,E_{CTR}] \leq 2 \text{Adv}_{PRF}[B,\text{AES}] + \frac{2q^2L}{|X|} 
+\]
+where in our case $|X| = 2^{128}$. 
 \end{itemize}
+
+% \section{Other things}
+% \paragraph{Using a web browser to do cryptography}
+% 
+% \paragraph{Potential attacks}
+% There are a couple of potential attacks on our script:
+% \begin{itemize}
+%  \item Brute-force attack on the password: having at his disposal the salt and the encrypted in the \texttt{localStorage}, a pirate could try to decrypt the database by trying a large number
+%  of passwords and see if the key generated from the salt and the password manage to decrypt the database. This is a serious attack as it can in theory be realized in parallel (by copying the files
+%  to several machines) and therefore if the password is not too strong, the database can be decrypted in a relatively small amount of time.
+% \end{itemize}
+
+
 \end{document}
+
+
