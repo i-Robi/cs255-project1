@@ -26,6 +26,7 @@
 
 var my_username; // user signed in as
 var keys = {}; // association map of keys: group -> key
+var dummyDatabaseEntry = "CXJTucBBuM/eQQV6v2B4SaVXn3Txsitydj2IUVCBEfqd5xuQ9ISZI7Am6/m5y1RDvwYp9BkXl3Mo3DMGeyT3kcJf7wNdcVb7dD6lS3cNg78k820mskPciOjZ1ZLGgLCClxHNdX9pW/Z1UMwE+88r94TNZpTaV2FWpTUr5uvcLL0="
 
 function increment(array) {
     array[3] += 1;
@@ -251,14 +252,14 @@ function GenerateKey(group) {
 
 /* Function: SaveKeys
  * ------------------
- * Function that saves keys on the disk. Adds a dummy entry '00000000'=>'0000'
+ * Function that saves keys on the disk. Adds a dummy entry dummyDatabaseEntry=>'0000'
  * before encrypting the object keys and writing it to the localStorage.
  */
 function SaveKeys() {
     if (cs255.localStorage.getItem('facebook-salt-' + my_username) == null) console.log('salt does not exits');
     var salt = JSON.parse(decodeURIComponent(cs255.localStorage.getItem('facebook-salt-' + my_username)));
     var key = sjcl.codec.base64.toBits(sessionStorage.getItem('keyDB'));
-    keys['00000000'] = '0000';
+    keys[dummyDatabaseEntry] = '0000';
     var key_str = JSON.stringify(keys);
     var cipher = new sjcl.cipher.aes(key);
     var encrypted_key_str = encryptString(key_str, cipher);
@@ -283,7 +284,7 @@ function decryptDatabase(password, salt) {
             return false;
         }   
         keys = JSON.parse(key_str);
-        if (keys['00000000'] === '0000') return true;
+        if (keys[dummyDatabaseEntry] === '0000') return true;
     }
     return false;
 }
@@ -332,7 +333,7 @@ function LoadKeys() {
       salt = GetRandomValues(4);
       var toSave = JSON.stringify(salt);
       cs255.localStorage.setItem('facebook-salt-' + my_username, encodeURIComponent(toSave));
-      keys['00000000'] = '0000';
+      keys[dummyDatabaseEntry] = '0000';
       key = sjcl.misc.pbkdf2(password, salt, null, 128);
       sessionStorage.setItem('keyDB', sjcl.codec.base64.fromBits(key));
       SaveKeys();  
@@ -694,7 +695,7 @@ function UpdateKeysTable() {
 
   // keys
   for (var group in keys) {
-    if (group === '00000000') continue;
+    if (group === dummyDatabaseEntry) continue;
     var row = document.createElement('tr');
     row.setAttribute("data-group", group);
     var td = document.createElement('td');
