@@ -84,7 +84,7 @@ function decrementBy(array, l) {
 /* Function: encryptChunks
  * -----------------------
  * Encrypt chunks using cipher. Uses a 128-bit random nonce as the input of 
- * Randomized Counter Mode.
+ * Randomized Counter Mode. Places the nonce at the beginning of the ciphertext.
  */
 function encryptChunks(chunks, cipher) {
     var nonce = GetRandomValues(4);
@@ -159,14 +159,10 @@ function encryptString(plainText, cipher) {
 // @param {String} group Group name.
 // @return {String} Encryption of the plaintext, encoded as a string.
 function Encrypt(plainText, group) {
-  // CS255-todo: encrypt the plainText, using key for the group.
   if ((plainText.indexOf('rot13:') == 0) || (plainText.length < 1)) {
-    // already done, or blank
     alert("Try entering a message (the button works only once)");
     return plainText;
   } else {
-    // encrypt, add tag.
-    //LoadKeys(); 
     var keyG = keys[group];
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(keyG));
     var encryptedMsg = encryptString(plainText, cipher);
@@ -237,6 +233,12 @@ function Decrypt(cipherText, group) {
 // Generate a new key for the given group.
 //
 // @param {String} group Group name.
+
+/* Functionp: GenerateKey
+ * ----------------------
+ * Generates a 256-bit key and encodes it in a base64 format before
+ * putting it in the keys object.
+ */
 function GenerateKey(group) {
   var keylen = 8;
   var key = GetRandomValues(keylen);
@@ -249,7 +251,7 @@ function GenerateKey(group) {
 
 /* Function: SaveKeys
  * ------------------
- * Function that save keys on the disk. Adds a dummy entry '00000000'=>'0000'
+ * Function that saves keys on the disk. Adds a dummy entry '00000000'=>'0000'
  * before encrypting the object keys and writing it to the localStorage.
  */
 function SaveKeys() {
@@ -300,6 +302,8 @@ function abort() {
  * Loads the keys. As this function is called when the user connects to FB, 
  * it manages the password needed to decrypt the DB (asks for such a password the first connection,
  * asks for the password when the user logs in ...) and decrypts the DB if possible (to load the keys in the object keys).
+ * Uses pbkdf to generate the key that decrypts the DB from the password and the salt. The key is stored in 
+ * sessionStorage so that the user is asked only once per session to provide his / her password.
  */
 function LoadKeys() {
   var salt;  
