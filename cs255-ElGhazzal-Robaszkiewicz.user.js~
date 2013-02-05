@@ -26,18 +26,7 @@
 
 var my_username; // user signed in as
 var keys = {}; // association map of keys: group -> key
-
-
-/*function encryptChunks(chunks, cipher) {
-    var res = [];
-    for (var i = 0; i < chunks.length; ++i) {
-        var temp = cipher.encrypt(sjcl.codec.utf8String.toBits(chunks[i]));        
-        res.push(sjcl.codec.base64.fromBits(temp));
-        //res.push(sjcl.codec.utf8String.fromBits(temp));
-        
-    }
-    return res;
-}*/
+var dummyDatabaseEntry = "CXJTucBBuM/eQQV6v2B4SaVXn3Txsitydj2IUVCBEfqd5xuQ9ISZI7Am6/m5y1RDvwYp9BkXl3Mo3DMGeyT3kcJf7wNdcVb7dD6lS3cNg78k820mskPciOjZ1ZLGgLCClxHNdX9pW/Z1UMwE+88r94TNZpTaV2FWpTUr5uvcLL0="
 
 function increment(array) {
     array[3] += 1;
@@ -52,6 +41,11 @@ function incrementBy(array, l) {
     array[3] += l;
 }
 
+/* Function: encryptChunks
+ * -----------------------
+ * Encrypt chunks using cipher. Uses a 128-bit random nonce as the input of 
+ * Randomized Counter Mode. Places the nonce at the beginning of the ciphertext.
+ */
 function encryptChunks(chunks, cipher) {
     var nonce = GetRandomValues(4);
     var blockMsg;    
@@ -69,6 +63,10 @@ function encryptChunks(chunks, cipher) {
     return res;
 }
 
+/* Function: concatenateChunks
+ * ---------------------------
+ * Concatenate the chunks of the array encryptedChunks.
+ */
 function concatenateChunks(encryptedChunks) {
     var res = '';
     for (var i = 0; i < encryptedChunks.length; ++i) {
@@ -77,16 +75,11 @@ function concatenateChunks(encryptedChunks) {
     return res;
 }
 
-/*function paddingLastChunk(chunks) {
-    var last = chunks[chunks.length - 1]
-    var size = last.length;
-    for (var i = 0; i < 16 - size; ++i) {
-        last += '0';
-    }
-    chunks[chunks.length - 1] = last;
-    return chunks;
-}*/
-
+/* Function: paddingLastChunk
+ * --------------------------
+ * Pads the last chunks (or adds a dummy block) by adding residual length (what remains at the end
+ * of the block) times the hexadecimal encoding of residual length.
+ */
 function paddingLastChunk(chunks) {
     var last = chunks[chunks.length - 1]
     var sizeLast = last.length;
@@ -105,12 +98,30 @@ function paddingLastChunk(chunks) {
     return chunks;
 }                
 
+/* Function: encryptString
+ * -----------------------
+ * The whole process to encrypt string.
+ */
 function encryptString(plainText, cipher) { 
+    plainText = encodeURIComponent(plainText);
     var chunks = plainText.match(/.{1,16}/g);
     chunks = paddingLastChunk(chunks);
     var encryptedChunks = encryptChunks(chunks, cipher);
     return concatenateChunks(encryptedChunks); 
 }
+
+function CBCMac(cipherText, key1, key2) {
+    var cipher = new sjcl.cipher.aes(key1);
+    var chunks = cipherText.match(/.{1,24}/g);
+    var temp = cipher.encrypt(sjcl.codec.base64.toBits(chunks[0]));
+    for (var i = 1; i < chunks.length; ++i) {
+        temp = cipher.encrypt(sjcl.bitArray._xor4(temp,sjcl.codec.base64.toBits(chunks[i]))); 
+    }
+    var cipher2 = new sjcl.cipher.aes(key2);
+    var tag = cipher2.encrypt(temp);
+    return sjcl.codec.base64.fromBits(tag);
+}
+
 // Some initialization functions are called at the very end of this script.
 // You only have to edit the top portion.
 
@@ -120,32 +131,27 @@ function encryptString(plainText, cipher) {
 // @param {String} group Group name.
 // @return {String} Encryption of the plaintext, encoded as a string.
 function Encrypt(plainText, group) {
-  // CS255-todo: encrypt the plainText, using key for the group.
   if ((plainText.indexOf('rot13:') == 0) || (plainText.length < 1)) {
-    // already done, or blank
     alert("Try entering a message (the button works only once)");
     return plainText;
   } else {
-    // encrypt, add tag.
-    //LoadKeys(); 
     var keyG = keys[group];
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(keyG));
     var encryptedMsg = encryptString(plainText, cipher);
-    return 'rot13:' + encryptedMsg; 
+    var key1 = 'Z+VNfdWz/mAiVB5jDpJrXg==';
+    var key2 = '5rCMtGQvQLkIiFfEeZ6YNQ==';
+    key1 = sjcl.codec.base64.toBits(key1);
+    key2 = sjcl.codec.base64.toBits(key2);
+    var tag = CBCMac(encryptedMsg, key1, key2);
+    console.log(tag);
+    return tag + encryptedMsg; 
   }
 }
     
-    
-/*function decryptByChunks(chunkedCT, cipher) {
-    var res = '';
-    for (var i = 0; i < chunkedCT.length; ++i) {
-        var temp = sjcl.codec.base64.toBits(chunkedCT[i]);
-        var decrypted = cipher.decrypt(temp);
-        res += sjcl.codec.utf8String.fromBits(decrypted);
-    }
-    return res;
-}*/
-
+/* Function: decryptByChunks
+ * -------------------------
+ * Decrypts the blocks contained in chunkedCT using cipher.
+ */
 function decryptByChunks(chunkedCT, cipher) { 
     var res = [];
     var nonce = sjcl.codec.base64.toBits(chunkedCT[0]);
@@ -162,7 +168,10 @@ function decryptByChunks(chunkedCT, cipher) {
     return res;
 }
     
-
+/* Function: removePadding
+ * -----------------------
+ * Removes the padding after the decryption.
+ */
 function removePadding(decryptedMsg) {
     var sizeMsg = decryptedMsg.length;
     var lastChar = decryptedMsg[sizeMsg - 1];
@@ -171,12 +180,14 @@ function removePadding(decryptedMsg) {
     return decryptedMsg;
 }
 
+/* Function: decryptString
+ * -----------------------
+ * The whole process of the decryption of cipherText using cipher.
+ */
 function decryptString(cipherText, cipher) { 
     var chunkedCT = cipherText.match(/.{1,24}/g);
-    //var encryptedBits = sjcl.codec.base64.toBits(cipherText);    
-    //return encryptedBits.length.toString();
     var decryptedMsg = decryptByChunks(chunkedCT, cipher);
-    return removePadding(decryptedMsg);
+    return decodeURIComponent(removePadding(decryptedMsg));
 }
 // Return the decryption of the message for the given group, in the form of a string.
 // Throws an error in case the string is not properly encrypted.
@@ -185,13 +196,15 @@ function decryptString(cipherText, cipher) {
 // @param {String} group Group name.
 // @return {String} Decryption of the ciphertext.
 function Decrypt(cipherText, group) {
-
-  // CS255-todo: implement decryption on encrypted messages
-
-  if (cipherText.indexOf('rot13:') == 0) {
-
-    // decrypt, ignore the tag.
-    cipherText = cipherText.slice(6);
+    var key1 = 'Z+VNfdWz/mAiVB5jDpJrXg==';
+    var key2 = '5rCMtGQvQLkIiFfEeZ6YNQ==';
+    key1 = sjcl.codec.base64.toBits(key1);
+    key2 = sjcl.codec.base64.toBits(key2);
+    var tag = cipherText.substr(0, 24);
+    cipherText = cipherText.substr(24);
+    console.log(tag);
+    console.log(CBCMac(cipherText, key1, key2));
+  if (tag === CBCMac(cipherText, key1, key2)) {
     var key = keys[group];
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
     return decryptString(cipherText, cipher); 
@@ -205,97 +218,126 @@ function Decrypt(cipherText, group) {
 // Generate a new key for the given group.
 //
 // @param {String} group Group name.
-function GenerateKey(group) {
 
+/* Functionp: GenerateKey
+ * ----------------------
+ * Generates a 256-bit key and encodes it in a base64 format before
+ * putting it in the keys object.
+ */
+function GenerateKey(group) {
   var keylen = 8;
   var key = GetRandomValues(keylen);
   var stringkey = sjcl.codec.base64.fromBits(key);
-  // CS255-todo: Well this needs some work...
-  //var key = 'CS255-todo';
-  keys[group] = stringkey;
+
+  // for MAC
+  var keylenMAC = 4;
+  var key1 = GetRandomValues(keylenMAC);
+  key1 = sjcl.codec.base64.fromBits(key1);
+  var key2 = GetRandomValues(keylenMAC);
+  key2 = sjcl.codec.base64.fromBits(key2);
+  keys[group] = stringkey + key1 + key2;
   SaveKeys();
 }
 
 // Take the current group keys, and save them to disk.
 
-
+/* Function: SaveKeys
+ * ------------------
+ * Function that saves keys on the disk. Adds a dummy entry dummyDatabaseEntry=>'0000'
+ * before encrypting the object keys and writing it to the localStorage.
+ */
 function SaveKeys() {
-    if (localStorage.getItem('facebook-salt-' + my_username) == null) console.log('salt does not exits');
-    var salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username)));
-    var password = sessionStorage.getItem('pwdDB');
-    // CS255-todo: plaintext keys going to disk?
-    var key = sjcl.misc.pbkdf2(password, salt, null, 128);
+    if (cs255.localStorage.getItem('facebook-salt-' + my_username) == null) console.log('salt does not exits');
+    var salt = JSON.parse(decodeURIComponent(cs255.localStorage.getItem('facebook-salt-' + my_username)));
+    var key = sjcl.codec.base64.toBits(sessionStorage.getItem('keyDB'));
+    keys[dummyDatabaseEntry] = '0000';
     var key_str = JSON.stringify(keys);
     var cipher = new sjcl.cipher.aes(key);
     var encrypted_key_str = encryptString(key_str, cipher);
-    localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(encrypted_key_str));
+    cs255.localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(encrypted_key_str));
 }
 
-// Load the group keys from disk.
-function LoadKeys() {
+/* Function: decryptDatabase
+ * -------------------------
+ * Returns true if and only if the password, altogether with the salt can decrypt 
+ * the database.
+ */
+function decryptDatabase(password, salt) {
+    var key = sjcl.misc.pbkdf2(password, salt, null, 128);
+    var saved = cs255.localStorage.getItem('facebook-keys-' + my_username);
+    if (saved) {
+        var cipher = new sjcl.cipher.aes(key);
+        var encryptedkey_str = decodeURIComponent(saved);
+        try {
+            var key_str = decryptString(encryptedkey_str, cipher);
+        }
+        catch(err) {
+            return false;
+        }   
+        keys = JSON.parse(key_str);
+        if (keys[dummyDatabaseEntry] === '0000') return true;
+    }
+    return false;
+}
 
+/* Function: abort
+ * ---------------
+ * Function triggered if the user presses cancel or does not want to enter a password. 
+ * Terminates the script.
+ */
+function abort() { 
+    throw new Error('Crypto script not loaded because password has not been entered. Please log out and relog to enter valid password.');
+}
+
+/* Function: LoadKeys
+ * ------------------
+ * Loads the keys. As this function is called when the user connects to FB, 
+ * it manages the password needed to decrypt the DB (asks for such a password the first connection,
+ * asks for the password when the user logs in ...) and decrypts the DB if possible (to load the keys in the object keys).
+ * Uses pbkdf to generate the key that decrypts the DB from the password and the salt. The key is stored in 
+ * sessionStorage so that the user is asked only once per session to provide his / her password.
+ */
+function LoadKeys() {
   var salt;  
   var password;
-  if (localStorage.getItem('facebook-salt-' + my_username)) {
-      salt = JSON.parse(decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username))); 
-      // if variable session does not exist, ask for it
-      if (sessionStorage.getItem('pwdDB') == null) {
-          password = prompt('Enter your password to decrypt DB');          
-          // test if open DB
-          sessionStorage.setItem('pwdDB', password);
+  var key;
+  if (my_username == undefined) {
+    return;
+  }
+  if (cs255.localStorage.getItem('facebook-salt-' + my_username) != null) {
+      salt = JSON.parse(decodeURIComponent(cs255.localStorage.getItem('facebook-salt-' + my_username))); 
+      if (sessionStorage.getItem('keyDB') == null) {
+          do {
+            password = prompt('Enter your password to decrypt DB'); 
+            if (!password) abort();
+          } while (!decryptDatabase(password, salt))
+          key = sjcl.misc.pbkdf2(password, salt, null, 128);
+          sessionStorage.setItem('keyDB', sjcl.codec.base64.fromBits(key));
       }
       else {
-          password = sessionStorage.getItem('pwdDB');     
+          key = sjcl.codec.base64.toBits(sessionStorage.getItem('keyDB'));
       } 
   }
   else {
       password = prompt('Create a pwd to decrypt your future DB');
+      if (!password) abort();
       salt = GetRandomValues(4);
       var toSave = JSON.stringify(salt);
-      localStorage.setItem('facebook-salt-' + my_username, encodeURIComponent(toSave));
-      sessionStorage.setItem('pwdDB', password);
+      cs255.localStorage.setItem('facebook-salt-' + my_username, encodeURIComponent(toSave));
+      keys[dummyDatabaseEntry] = '0000';
+      key = sjcl.misc.pbkdf2(password, salt, null, 128);
+      sessionStorage.setItem('keyDB', sjcl.codec.base64.fromBits(key));
+      SaveKeys();  
   }
   keys = {}; // Reset the keys.
-  var key = sjcl.misc.pbkdf2(password, salt, null, 128);
-  var saved = localStorage.getItem('facebook-keys-' + my_username);
+  var saved = cs255.localStorage.getItem('facebook-keys-' + my_username);
   if (saved) {
     var cipher = new sjcl.cipher.aes(key);
     var encryptedkey_str = decodeURIComponent(saved);
-    console.log(encryptedkey_str);
-    // CS255-todo: plaintext keys were on disk?
     var key_str = decryptString(encryptedkey_str, cipher);
-    console.log(key_str);
     keys = JSON.parse(key_str);
   }
 }
-
-
-/*
-function SaveKeys() {
-  
-  var password = 'bla';
-  var salt = decodeURIComponent(localStorage.getItem('facebook-salt-' + my_username));
-  var key = sjcl.misc.pbkdf2(password, salt, null, 128);
-    
-  // CS255-todo: plaintext keys going to disk?
-  var key_str = JSON.stringify(keys);
-
-  
-
-  localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(key_str));
-}
-
-// Load the group keys from disk.
-function LoadKeys() {
-  keys = {}; // Reset the keys.
-  var saved = localStorage.getItem('facebook-keys-' + my_username);
-  if (saved) {
-    var key_str = decodeURIComponent(saved);
-    // CS255-todo: plaintext keys were on disk?
-    keys = JSON.parse(key_str);
-  }
-}
-*/
 
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
@@ -348,6 +390,35 @@ function LoadKeys() {
 //
 /////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////
+var cs255 = {
+  localStorage: {
+    setItem: function(key, value) {
+      localStorage.setItem(key, value);
+      var newEntries = {};
+      newEntries[key] = value;
+      chrome.storage.local.set(newEntries);
+    },
+    getItem: function(key) {
+      return localStorage.getItem(key);
+    },
+    clear: function() {
+      chrome.storage.local.clear();
+    }
+  }
+}
+
+if (typeof chrome.storage === "undefined") {
+  var id = function() {};
+  chrome.storage = {local: {get: id, set: id}};
+}
+else {
+  // See if there are any values stored with the extension.
+  chrome.storage.local.get(null, function(onDisk) {
+    for (key in onDisk) {
+      localStorage.setItem(key, onDisk[key]);
+    }
+  });
+}
 
 // Get n 32-bit-integers entropy as an array. Defaults to 1 word
 function GetRandomValues(n) {
@@ -615,6 +686,7 @@ function UpdateKeysTable() {
 
   // keys
   for (var group in keys) {
+    if (group === dummyDatabaseEntry) continue;
     var row = document.createElement('tr');
     row.setAttribute("data-group", group);
     var td = document.createElement('td');
