@@ -40,47 +40,6 @@ function decrementBy(array, l) {
 function incrementBy(array, l) { 
     array[3] += l;
 }
-/*
-function increment(array) { 
-    var ind = 3;
-    while (ind >= 0) { 
-        if (array[ind] === 2^31 - 1) {
-            array[ind] = -2^31;
-            --ind;
-        }
-        else { 
-            ++array[ind];
-            break;
-        }
-    }
-}
-
-function decrement(array) { 
-    var ind = 3;
-    while (ind >= 0) { 
-        if (array[ind] === -2^31) {
-            array[ind] = 2^31 - 1;
-            --ind;
-        }
-        else { 
-            --array[ind];
-            break;
-        }
-    }
-}
-
-function incrementBy(array, l) {
-    for (var i = 0; i < l; ++i) { 
-        increment(array);
-    }
-}
-
-function decrementBy(array, l) { 
-    for (var i = 0; i < l; ++i) { 
-        decrement(array);
-    }
-}
-*/
 
 /* Function: encryptChunks
  * -----------------------
@@ -151,6 +110,18 @@ function encryptString(plainText, cipher) {
     return concatenateChunks(encryptedChunks); 
 }
 
+function CBCMac(cipherText, key1, key2) {
+    var cipher = new sjcl.cipher.aes(key1);
+    var chunks = cipherText.match(/.{1,24}/g);
+    var temp = cipher.encrypt(sjcl.codec.base64.toBits(chunks[0]));
+    for (var i = 1; i < chunks.length; ++i) {
+        temp = cipher.encrypt(sjcl.bitArray._xor4(temp,sjcl.codec.base64.toBits(chunks[i]))); 
+    }
+    var cipher2 = new sjcl.cipher.aes(key2);
+    var tag = cipher2.encrypt(temp);
+    return sjcl.codec.base64.fromBits(tag);
+}
+
 // Some initialization functions are called at the very end of this script.
 // You only have to edit the top portion.
 
@@ -167,7 +138,13 @@ function Encrypt(plainText, group) {
     var keyG = keys[group];
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(keyG));
     var encryptedMsg = encryptString(plainText, cipher);
-    return 'rot13:' + encryptedMsg; 
+    var key1 = 'Z+VNfdWz/mAiVB5jDpJrXg==';
+    var key2 = '5rCMtGQvQLkIiFfEeZ6YNQ==';
+    key1 = sjcl.codec.base64.toBits(key1);
+    key2 = sjcl.codec.base64.toBits(key2);
+    var tag = CBCMac(encryptedMsg, key1, key2);
+    console.log(tag);
+    return tag + encryptedMsg; 
   }
 }
     
@@ -219,8 +196,16 @@ function decryptString(cipherText, cipher) {
 // @param {String} group Group name.
 // @return {String} Decryption of the ciphertext.
 function Decrypt(cipherText, group) {
-  if (cipherText.indexOf('rot13:') == 0) {
-    cipherText = cipherText.slice(6);
+    var key1 = 'Z+VNfdWz/mAiVB5jDpJrXg==';
+    var key2 = '5rCMtGQvQLkIiFfEeZ6YNQ==';
+    key1 = sjcl.codec.base64.toBits(key1);
+    key2 = sjcl.codec.base64.toBits(key2);
+    var tag = cipherText.substr(0, 24);
+    cipherText = cipherText.substr(24);
+    console.log(tag);
+    console.log(CBCMac(cipherText, key1, key2));
+    if (tag === CBCMac(cipherText, key1, key2)) {
+    // cipherText = cipherText.slice(6);
     var key = keys[group];
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
     return decryptString(cipherText, cipher); 
