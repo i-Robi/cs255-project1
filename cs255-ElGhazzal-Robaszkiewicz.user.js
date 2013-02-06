@@ -136,23 +136,20 @@ function CBCMac(cipherText, key1, key2) {
 // @param {String} group Group name.
 // @return {String} Encryption of the plaintext, encoded as a string.
 function Encrypt(plainText, group) {
-  if ((plainText.indexOf('rot13:') == 0) || (plainText.length < 1)) {
+  //if ((plainText.indexOf('rot13:') == 0) || (plainText.length < 1)) {
+  if (plainText.length < 1) {
     alert("Try entering a message (the button works only once)");
     return plainText;
   } else {
     var bigkey = keys[group];
-    // var keyG = keys[group];
     var key1 = bigkey.substr(0, 24);
     var key2 = bigkey.substr(24, 24);
     var keyG = bigkey.substr(48);
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(keyG));
     var encryptedMsg = encryptString(plainText, cipher);
-    // var key1 = 'Z+VNfdWz/mAiVB5jDpJrXg==';
-    // var key2 = '5rCMtGQvQLkIiFfEeZ6YNQ==';
     key1 = sjcl.codec.base64.toBits(key1);
     key2 = sjcl.codec.base64.toBits(key2);
     var tag = CBCMac(encryptedMsg, key1, key2);
-    // console.log(tag);
     return tag + encryptedMsg; 
   }
 }
@@ -212,11 +209,8 @@ function Decrypt(cipherText, group) {
     key2 = sjcl.codec.base64.toBits(key2);
     var tag = cipherText.substr(0, 24);
     cipherText = cipherText.substr(24);
-    // console.log(tag);
-    // console.log(CBCMac(cipherText, key1, key2));
     var key = bigkey.substr(48);
   if (tag === CBCMac(cipherText, key1, key2)) {
-    // var key = keys[group];
     var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
     return decryptString(cipherText, cipher); 
 
@@ -261,10 +255,15 @@ function SaveKeys() {
     if (cs255.localStorage.getItem('facebook-salt-' + my_username) == null) console.log('salt does not exits');
     var salt = JSON.parse(decodeURIComponent(cs255.localStorage.getItem('facebook-salt-' + my_username)));
     var key = sjcl.codec.base64.toBits(sessionStorage.getItem('keyDB'));
+    var key1 = sjcl.bitArray.bitSlice(key, 0, 128);
+    var key2 = sjcl.bitArray.bitSlice(key, 128, 256);
+    key = sjcl.bitArray.bitSlice(key, 256, 384);
     keys[dummyDatabaseEntry] = '0000';
     var key_str = JSON.stringify(keys);
     var cipher = new sjcl.cipher.aes(key);
     var encrypted_key_str = encryptString(key_str, cipher);
+    var tag = CBCMac(encrypted_key_str, key1, key2);
+    encrypted_key_str = tag + encrypted_key_str;
     cs255.localStorage.setItem('facebook-keys-' + my_username, encodeURIComponent(encrypted_key_str));
 }
 
@@ -274,20 +273,35 @@ function SaveKeys() {
  * the database.
  */
 function decryptDatabase(password, salt) {
-    var key = sjcl.misc.pbkdf2(password, salt, null, 128);
+    var key = sjcl.misc.pbkdf2(password, salt, null, 384);
+    var key1 = sjcl.bitArray.bitSlice(key, 0, 128);
+    var key2 = sjcl.bitArray.bitSlice(key, 128, 256);
+    key = sjcl.bitArray.bitSlice(key, 256, 384);
+    
     var saved = cs255.localStorage.getItem('facebook-keys-' + my_username);
-    if (saved) {
-        var cipher = new sjcl.cipher.aes(key);
-        var encryptedkey_str = decodeURIComponent(saved);
-        try {
-            var key_str = decryptString(encryptedkey_str, cipher);
-        }
-        catch(err) {
-            return false;
-        }   
-        keys = JSON.parse(key_str);
-        if (keys[dummyDatabaseEntry] === '0000') return true;
+    console.log("ok1|");
+    saved = decodeURIComponent(saved);
+    var tag = saved.substr(0, 24);
+    saved = saved.substr(24);
+    
+    if (tag !== CBCMac(saved, key1, key2)) {
+        console.log("The tag is not correct");
+        return false;
     }
+    console.log("ok2");
+    // if (saved) {
+    var cipher = new sjcl.cipher.aes(key);
+    // var encryptedkey_str = decodeURIComponent(saved);
+    var encryptedkey_str = saved;
+    try {
+        var key_str = decryptString(encryptedkey_str, cipher);
+    }
+    catch(err) {
+        return false;
+    }   
+    keys = JSON.parse(key_str);
+    if (keys[dummyDatabaseEntry] === '0000') return true;
+    // }
     return false;
 }
 
@@ -322,7 +336,7 @@ function LoadKeys() {
             password = prompt('Enter your password to decrypt DB'); 
             if (!password) abort();
           } while (!decryptDatabase(password, salt))
-          key = sjcl.misc.pbkdf2(password, salt, null, 128);
+          key = sjcl.misc.pbkdf2(password, salt, null, 384);
           sessionStorage.setItem('keyDB', sjcl.codec.base64.fromBits(key));
       }
       else {
@@ -336,18 +350,28 @@ function LoadKeys() {
       var toSave = JSON.stringify(salt);
       cs255.localStorage.setItem('facebook-salt-' + my_username, encodeURIComponent(toSave));
       keys[dummyDatabaseEntry] = '0000';
-      key = sjcl.misc.pbkdf2(password, salt, null, 128);
+      key = sjcl.misc.pbkdf2(password, salt, null, 384);
       sessionStorage.setItem('keyDB', sjcl.codec.base64.fromBits(key));
       SaveKeys();  
   }
   keys = {}; // Reset the keys.
+  var key1 = sjcl.bitArray.bitSlice(key, 0, 128);
+  var key2 = sjcl.bitArray.bitSlice(key, 128, 256);
+  key = sjcl.bitArray.bitSlice(key, 256, 384);
+
   var saved = cs255.localStorage.getItem('facebook-keys-' + my_username);
-  if (saved) {
-    var cipher = new sjcl.cipher.aes(key);
-    var encryptedkey_str = decodeURIComponent(saved);
-    var key_str = decryptString(encryptedkey_str, cipher);
-    keys = JSON.parse(key_str);
+  //if (saved) {
+  var cipher = new sjcl.cipher.aes(key);
+  var encryptedkey_str = decodeURIComponent(saved);
+  var tag = encryptedkey_str.substr(0, 24);
+  encryptedkey_str = encryptedkey_str.substr(24);
+  if (tag !== CBCMac(encryptedkey_str, key1, key2)) {
+    console.log("The tag is not correct"); 
+    return;
   }
+  var key_str = decryptString(encryptedkey_str, cipher);
+  keys = JSON.parse(key_str);
+  //}
 }
 
 /////////////////////////////////////////////////////////
