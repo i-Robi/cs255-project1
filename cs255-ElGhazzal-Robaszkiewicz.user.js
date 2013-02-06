@@ -141,14 +141,21 @@ function Encrypt(plainText, group) {
     alert("Try entering a message (the button works only once)");
     return plainText;
   } else {
-    var bigkey = keys[group];
+    /*var bigkey = keys[group];
     var key1 = bigkey.substr(0, 24);
     var key2 = bigkey.substr(24, 24);
     var keyG = bigkey.substr(48);
-    var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(keyG));
-    var encryptedMsg = encryptString(plainText, cipher);
     key1 = sjcl.codec.base64.toBits(key1);
     key2 = sjcl.codec.base64.toBits(key2);
+    */
+    
+    var bigkey = sjcl.codec.base64.toBits(keys[group]);
+    var key1 = sjcl.bitArray.bitSlice(bigkey, 0, 128);
+    var key2 = sjcl.bitArray.bitSlice(bigkey, 128, 256);
+    var keyG = sjcl.bitArray.bitSlice(bigkey, 256, 384);
+    
+    var cipher = new sjcl.cipher.aes(keyG);
+    var encryptedMsg = encryptString(plainText, cipher);
     var tag = CBCMac(encryptedMsg, key1, key2);
     return tag + encryptedMsg; 
   }
@@ -202,16 +209,26 @@ function decryptString(cipherText, cipher) {
 // @param {String} group Group name.
 // @return {String} Decryption of the ciphertext.
 function Decrypt(cipherText, group) {
-    var bigkey = keys[group];
+    /*var bigkey = keys[group];
     var key1 = bigkey.substr(0, 24);
     var key2 = bigkey.substr(24, 24);
     key1 = sjcl.codec.base64.toBits(key1);
     key2 = sjcl.codec.base64.toBits(key2);
+    var key = bigkey.substr(48);
+    
+    */
+    
+    var key = sjcl.codec.base64.toBits(keys[group]);
+    var key1 = sjcl.bitArray.bitSlice(key, 0, 128);
+    var key2 = sjcl.bitArray.bitSlice(key, 128, 256);
+    key = sjcl.bitArray.bitSlice(key, 256, 384);
+    
     var tag = cipherText.substr(0, 24);
     cipherText = cipherText.substr(24);
-    var key = bigkey.substr(48);
+    console.log(tag);
+    console.log(CBCMac(cipherText, key1, key2));
   if (tag === CBCMac(cipherText, key1, key2)) {
-    var cipher = new sjcl.cipher.aes(sjcl.codec.base64.toBits(key));
+    var cipher = new sjcl.cipher.aes(key);
     return decryptString(cipherText, cipher); 
 
   } else {
@@ -279,7 +296,6 @@ function decryptDatabase(password, salt) {
     key = sjcl.bitArray.bitSlice(key, 256, 384);
     
     var saved = cs255.localStorage.getItem('facebook-keys-' + my_username);
-    console.log("ok1|");
     saved = decodeURIComponent(saved);
     var tag = saved.substr(0, 24);
     saved = saved.substr(24);
@@ -288,7 +304,6 @@ function decryptDatabase(password, salt) {
         console.log("The tag is not correct");
         return false;
     }
-    console.log("ok2");
     // if (saved) {
     var cipher = new sjcl.cipher.aes(key);
     // var encryptedkey_str = decodeURIComponent(saved);
