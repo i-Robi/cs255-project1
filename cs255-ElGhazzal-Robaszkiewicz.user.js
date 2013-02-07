@@ -202,6 +202,15 @@ function decryptString(cipherText, cipher) {
     var decryptedMsg = decryptByChunks(chunkedCT, cipher);
     return decodeURIComponent(removePadding(decryptedMsg));
 }
+
+/* Function: trim
+ * -----------------------
+ * Escapes some null characters that could appear during fromBits/toBits
+ */
+function trim(string){
+   return string.replace(/[^A-Za-z 0-9 \.,\?""!@#\$%\^&\*\(\)-_=\+;:<>\/\\\|\}\{\[\]`~]*/g, '');
+}
+
 // Return the decryption of the message for the given group, in the form of a string.
 // Throws an error in case the string is not properly encrypted.
 //
@@ -222,11 +231,13 @@ function Decrypt(cipherText, group) {
     var key1 = sjcl.bitArray.bitSlice(key, 0, 128);
     var key2 = sjcl.bitArray.bitSlice(key, 128, 256);
     key = sjcl.bitArray.bitSlice(key, 256, 384);
-    
+    cipherText = trim(cipherText);
     var tag = cipherText.substr(0, 24);
     cipherText = cipherText.substr(24);
-    console.log(tag);
-    console.log(CBCMac(cipherText, key1, key2));
+    console.log("Tag length:        " + tag.length);
+    console.log("Ciphertext length: " + cipherText.length);
+    console.log("Tag:               " + tag);
+    console.log("CBCMac:            " + CBCMac(cipherText, key1, key2));
   if (tag === CBCMac(cipherText, key1, key2)) {
     var cipher = new sjcl.cipher.aes(key);
     return decryptString(cipherText, cipher); 
