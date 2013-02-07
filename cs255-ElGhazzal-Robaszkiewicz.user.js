@@ -210,7 +210,17 @@ function decryptString(cipherText, cipher) {
 function trim(string){
    return string.replace(/[^A-Za-z 0-9 \.,\?""!@#\$%\^&\*\(\)-_=\+;:<>\/\\\|\}\{\[\]`~]*/g, '');
 }
-
+/*
+function checkTag(tag, cbc) {
+  var tagArray = sjcl.codec.utf8String.toBits(tag);
+  var cbcArray = sjcl.codec.utf8String.toBits(cbc);
+  var ans = true;
+  for (var i = 0; i < Math.min(tagArray.length, cbcArray.length); i++) {
+    ans = (tagArray[i] === cbcArray[i] ? ans : ans && false);
+  }
+  return ans;
+}
+*/
 // Return the decryption of the message for the given group, in the form of a string.
 // Throws an error in case the string is not properly encrypted.
 //
@@ -234,11 +244,12 @@ function Decrypt(cipherText, group) {
     cipherText = trim(cipherText);
     var tag = cipherText.substr(0, 24);
     cipherText = cipherText.substr(24);
-    console.log("Tag length:        " + tag.length);
+    var cbc = CBCMac(cipherText, key1, key2);
+    /*console.log("Tag length:        " + tag.length);
     console.log("Ciphertext length: " + cipherText.length);
     console.log("Tag:               " + tag);
-    console.log("CBCMac:            " + CBCMac(cipherText, key1, key2));
-  if (tag === CBCMac(cipherText, key1, key2)) {
+    console.log("CBCMac:            " + CBCMac(cipherText, key1, key2));*/
+  if (tag === cbc) {
     var cipher = new sjcl.cipher.aes(key);
     return decryptString(cipherText, cipher); 
 
