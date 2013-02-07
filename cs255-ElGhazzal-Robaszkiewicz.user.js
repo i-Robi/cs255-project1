@@ -210,17 +210,28 @@ function decryptString(cipherText, cipher) {
 function trim(string){
    return string.replace(/[^A-Za-z 0-9 \.,\?""!@#\$%\^&\*\(\)-_=\+;:<>\/\\\|\}\{\[\]`~]*/g, '');
 }
-/*
+
+/* Function: checkTag
+ * -----------------------
+ * Checks message integrity by transforming the strings to a bitArray and comparing
+ * each cell of the arrays one by one until the end to prevent timing attacks.
+ */
 function checkTag(tag, cbc) {
+  
+  // Converting to bitArrays
   var tagArray = sjcl.codec.utf8String.toBits(tag);
   var cbcArray = sjcl.codec.utf8String.toBits(cbc);
+  
+  // Checking each cell of the bitArrays until the end
   var ans = true;
   for (var i = 0; i < Math.min(tagArray.length, cbcArray.length); i++) {
     ans = (tagArray[i] === cbcArray[i] ? ans : ans && false);
   }
-  return ans;
+
+  // Return the result
+  return (tagArray.length === cbcArray.length) && ans;
 }
-*/
+
 // Return the decryption of the message for the given group, in the form of a string.
 // Throws an error in case the string is not properly encrypted.
 //
@@ -228,31 +239,25 @@ function checkTag(tag, cbc) {
 // @param {String} group Group name.
 // @return {String} Decryption of the ciphertext.
 function Decrypt(cipherText, group) {
-    /*var bigkey = keys[group];
-    var key1 = bigkey.substr(0, 24);
-    var key2 = bigkey.substr(24, 24);
-    key1 = sjcl.codec.base64.toBits(key1);
-    key2 = sjcl.codec.base64.toBits(key2);
-    var key = bigkey.substr(48);
-    
-    */
-    
+
+    // Generating the 3 keys we will need
     var key = sjcl.codec.base64.toBits(keys[group]);
     var key1 = sjcl.bitArray.bitSlice(key, 0, 128);
     var key2 = sjcl.bitArray.bitSlice(key, 128, 256);
     key = sjcl.bitArray.bitSlice(key, 256, 384);
+
+    // Cleaning the original cipherText (removing null characters)
     cipherText = trim(cipherText);
+
+    // Separating tag from the rest of the cipherText
     var tag = cipherText.substr(0, 24);
     cipherText = cipherText.substr(24);
-    var cbc = CBCMac(cipherText, key1, key2);
-    /*console.log("Tag length:        " + tag.length);
-    console.log("Ciphertext length: " + cipherText.length);
-    console.log("Tag:               " + tag);
-    console.log("CBCMac:            " + CBCMac(cipherText, key1, key2));*/
-  if (tag === cbc) {
-    var cipher = new sjcl.cipher.aes(key);
-    return decryptString(cipherText, cipher); 
 
+    // Checking integrity
+    var cbc = CBCMac(cipherText, key1, key2);
+    if (tag === cbc) {
+        var cipher = new sjcl.cipher.aes(key);
+        return decryptString(cipherText, cipher);
   } else {
     throw "not encrypted";
   }
