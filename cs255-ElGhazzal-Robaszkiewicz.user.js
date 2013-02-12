@@ -296,7 +296,7 @@ function GenerateKey(group) {
  * before encrypting the object keys and writing it to the localStorage.
  */
 function SaveKeys() {
-    if (cs255.localStorage.getItem('facebook-salt-' + my_username) == null) console.log('salt does not exits');
+    if (cs255.localStorage.getItem('facebook-salt-' + my_username) == null) console.log('salt does not exit');
     var salt = JSON.parse(decodeURIComponent(cs255.localStorage.getItem('facebook-salt-' + my_username)));
     var key = sjcl.codec.base64.toBits(sessionStorage.getItem('keyDB'));
     var key1 = sjcl.bitArray.bitSlice(key, 0, 128);
@@ -328,7 +328,6 @@ function decryptDatabase(password, salt) {
     saved = saved.substr(24);
     
     if (tag !== CBCMac(saved, key1, key2)) {
-        console.log("The tag is not correct");
         return false;
     }
     // if (saved) {
@@ -408,7 +407,6 @@ function LoadKeys() {
   var tag = encryptedkey_str.substr(0, 24);
   encryptedkey_str = encryptedkey_str.substr(24);
   if (tag !== CBCMac(encryptedkey_str, key1, key2)) {
-    console.log("The tag is not correct"); 
     return;
   }
   var key_str = decryptString(encryptedkey_str, cipher);
